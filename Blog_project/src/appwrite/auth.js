@@ -1,64 +1,69 @@
-import conf from "../conf/conf";
-
+import conf from '../conf/conf.js';
 import { Client, Account, ID } from "appwrite";
 
 export class AuthService {
     client = new Client();
     account;
-
+    
     constructor() {
-        this.client.setEndpoint(conf.appwriterUrl).setProject(conf.appwriterProjectId);
+        this.client
+            .setEndpoint(conf.appwriteUrl)
+            .setProject(conf.appwriteProjectId);
         this.account = new Account(this.client);
     }
 
-    async createAccount({email, password, name }) {
-
-        // eslint-disable-next-line no-useless-catch
+    async createAccount({ email, password, name }) {
         try {
             const userAccount = await this.account.create(ID.unique(), email, password, name);
-            if (userAccount) {
-                return this.login({email, password});
-            }else {
-                return  userAccount;
+            if (!userAccount) {
+                // Attempt to log in right after creating the account
+                
+                return await this.login({ email, password });
+                // throw new Error("Account created successfully, but login is not implemented.");
+            } else {
+                throw new Error("Account creation failed.");
             }
         } catch (error) {
-            throw error;
+            console.error("Appwrite service :: createAccount :: error", error);
+            throw new Error("Error creating account: " + error.message);
         }
     }
 
-    async login({email, password}) {
-        // eslint-disable-next-line no-useless-catch
+    async login({ email, password }) {
         try {
-            const session = await this.account.createEmailSession(email, password);
-            return session;
+            return await this.account.createEmailPasswordSession(email, password);
         } catch (error) {
-            throw error;
+            console.error("Appwrite service :: login :: error", error);
+    
+            // Optional: Provide specific feedback for common errors
+            if (error.code === 401) {
+                throw new Error("Invalid email or password.");
+            }
+    
+            throw new Error("Login failed: " + (error.message || "Unknown error"));
         }
     }
+    
 
-    async getcurrentUser() {
-        // eslint-disable-next-line no-useless-catch
+    async getCurrentUser() {
         try {
-            const user = await this.account.get();
-            return user;
+            return await this.account.get();
         } catch (error) {
-            throw error;
+            console.error("Appwrite service :: getCurrentUser :: error", error);
+            throw new Error(error?.message || "Unable to fetch current user.");
         }
-        // eslint-disable-next-line no-unreachable
-        return null
     }
+    
 
     async logout() {
-        // eslint-disable-next-line no-useless-catch
         try {
-            const session = await this.account.deleteSessions();
-            return session;
+            await this.account.deleteSessions();
         } catch (error) {
-            throw error;
+            console.error("Appwrite service :: logout :: error", error);
+            throw new Error("Error logging out: " + error.message);
         }
     }
 }
 
 const authService = new AuthService();
-
 export default authService;
